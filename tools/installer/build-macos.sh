@@ -10,17 +10,43 @@
 # MDM_NOTARY_PROFILE=<name> (a `xcrun notarytool store-credentials` profile) also has Apple notarize
 # the app and the .dmg: Safari ignores a Developer ID extension that isn't.
 # Needs: macOS with Xcode's command line tools (swiftc), rustup, pwsh (the extension).
-#   tools/installer/build-macos.sh [--no-build]
+#   tools/installer/build-macos.sh [--no-build] [--arch arm64|x86_64|all]
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 dist="$root/target/dist"
 version="$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' "$root/Cargo.toml" | head -1)"
 [ -n "$version" ] || { echo "no version in Cargo.toml" >&2; exit 1; }
 programs=(misterdownloadmanager misterdownloadmanager-nmhost misterdownloadmanager-cli misterdownloadmanager-mcp)
-# Rust's target and the processor's name in the release files (as macOS calls it), with ':'.
-targets=(aarch64-apple-darwin:arm64 x86_64-apple-darwin:x86_64)
 
-if [ "${1:-}" != "--no-build" ]; then
+no_build=false
+arch_filter="all"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-build) no_build=true ;;
+    --arch)
+      shift
+      arch_filter="${1:-all}"
+      ;;
+    --arch=*)
+      arch_filter="${1#--arch=}"
+      ;;
+    *)
+      echo "unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+# Rust's target and the processor's name in the release files (as macOS calls it), with ':'.
+case "$arch_filter" in
+  arm64) targets=(aarch64-apple-darwin:arm64) ;;
+  x86_64) targets=(x86_64-apple-darwin:x86_64) ;;
+  all) targets=(aarch64-apple-darwin:arm64 x86_64-apple-darwin:x86_64) ;;
+  *) echo "unsupported --arch '$arch_filter' (expected arm64, x86_64, or all)" >&2; exit 1 ;;
+esac
+
+if [ "$no_build" = false ]; then
   for pair in "${targets[@]}"; do
     t="${pair%%:*}"
     rustup target add "$t"
@@ -91,6 +117,33 @@ for pair in "${targets[@]}"; do
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>BitTorrent Magnet URL</string>
+      <key>CFBundleURLSchemes</key>
+      <array><string>magnet</string></array>
+      <key>LSHandlerRank</key><string>Owner</string>
+    </dict>
+  </array>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>BitTorrent Document</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Owner</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>org.bittorrent.torrent</string>
+        <string>com.bittorrent.torrent</string>
+        <string>public.bittorrent-torrent</string>
+      </array>
+      <key>CFBundleTypeExtensions</key>
+      <array><string>torrent</string></array>
+      <key>CFBundleTypeMIMETypes</key>
+      <array><string>application/x-bittorrent</string></array>
+    </dict>
+  </array>
 </dict>
 </plist>
 EOF

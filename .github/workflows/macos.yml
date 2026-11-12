@@ -1,0 +1,64 @@
+name: macOS Build & Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Target Architecture"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - arm64
+          - x86_64
+  push:
+    branches:
+      - "feat/macos-**"
+      - "macos-**"
+    paths:
+      - "crates/**"
+      - "tools/installer/build-macos.sh"
+      - "tools/safari/**"
+      - ".github/workflows/macos.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build macOS DMG (${{ github.event.inputs.arch || 'all' }})
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install PowerShell for Extension Packing
+        run: brew install --cask powershell || true
+
+      - name: Build macOS DMGs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ARCH="${{ github.event.inputs.arch || 'all' }}"
+          bash tools/installer/build-macos.sh --arch "$ARCH"
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: macos-dmg
+          path: target/dist/*
