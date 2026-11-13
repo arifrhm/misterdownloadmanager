@@ -1510,6 +1510,9 @@ fn popup_level<C: Clone>(
             hint,
         );
     }
+    if result.is_some() {
+        ctx.send_viewport_cmd_to(vid, egui::ViewportCommand::Visible(false));
+    }
 }
 
 // ---- toolbar -------------------------------------------------------------------------------

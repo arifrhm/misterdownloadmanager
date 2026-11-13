@@ -4946,7 +4946,22 @@ pub fn start_pick(
     let slot: PickSlot = Default::default();
     ctx.data_mut(|d| d.insert_temp(id, slot.clone()));
     let wake = ctx.clone();
+    let current_pass = ctx.cumulative_pass_nr();
+    wake.request_repaint();
     std::thread::spawn(move || {
+        // Wait for the UI thread to complete the current frame and render the next pass,
+        // so that transient popups (such as context menus or submenu windows) are
+        // completely hidden and destroyed before the modal file dialog takes over
+        // the main thread runloop (#615).
+        let start = std::time::Instant::now();
+        while wake.cumulative_pass_nr() <= current_pass
+            && start.elapsed() < std::time::Duration::from_millis(500)
+        {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        #[cfg(target_os = "macos")]
+        std::thread::sleep(std::time::Duration::from_millis(25));
+
         let answer = ask();
         *slot.lock().unwrap() = Some(answer);
         wake.request_repaint();
@@ -6439,6 +6454,41 @@ pub mod caption {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #615: start_pick waits for the next UI pass so transient popup viewports
+    /// (e.g. context menus) are dropped and hidden before the modal file dialog starts.
+    #[test]
+    fn start_pick_defers_modal_ask_until_next_pass() {
+        let ctx = egui::Context::default();
+        let executed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let executed_clone = executed.clone();
+
+        start_pick(&ctx, "test-pick-delay", move || {
+            executed_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+            Some(std::path::PathBuf::from("/tmp/test"))
+        });
+
+        // Immediately on the same pass, ask() must not have completed yet.
+        assert_eq!(picked(&ctx, "test-pick-delay"), None);
+        assert!(!executed.load(std::sync::atomic::Ordering::SeqCst));
+
+        // Advance pass by running UI.
+        let mut out = ctx.run_ui(egui::RawInput::default(), |_| {});
+        out.textures_delta.clear();
+
+        // Wait a short moment for the background thread to finish.
+        let start = std::time::Instant::now();
+        while !executed.load(std::sync::atomic::Ordering::SeqCst)
+            && start.elapsed() < std::time::Duration::from_millis(300)
+        {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(executed.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(
+            picked(&ctx, "test-pick-delay"),
+            Some(std::path::PathBuf::from("/tmp/test"))
+        );
+    }
 
     /// `r` already gives the screen rect (mirrored in RTL); `rect` around it mirrors it back,
     /// so the thing stays at its English place in Arabic (#170: the browser offer window's logo
