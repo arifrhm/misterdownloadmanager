@@ -627,6 +627,9 @@ These ship in the next version.
 - ✅ A video of unknown size no longer reads 99.9 % from its first second while yt-dlp downloads it,
   and a video named after a page titled with its file's name gets its extension once (Dropbox's
   `Episode 31.mp4.mp4`) ([#622](https://github.com/anefzaoui/misterdownloadmanager/issues/622))
+- ✅ macOS: file picker dialogs opened from a menu (**View → Theme → Add a theme file**) close and
+  hide open menu windows immediately before the modal Finder panel opens, leaving no orphan
+  menu floating on screen ([#615](https://github.com/anefzaoui/misterdownloadmanager/issues/615))
 - ✅ Tests: the crash reports' end-to-end tests find their crashing example where Rust 1.100's
   Cargo builds the tests (in its build folder, no longer in deps/), as well as where earlier ones
   did ([#934](https://github.com/anefzaoui/misterdownloadmanager/issues/934))
