@@ -1584,6 +1584,10 @@ const videoPageOn = (() => {
   assert.equal(at("https://youtu.be/dQw4w9WgXcQ?t=10&list=PL999"), "https://youtu.be/dQw4w9WgXcQ");
   assert.equal(at("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=5"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   assert.equal(at("https://vimeo.com/123456789?list=abc"), "https://vimeo.com/123456789?list=abc");
+  // Google Drive: a view page, a preview page, and a file opened from a folder.
+  assert.equal(at("https://drive.google.com/file/d/1n4yUkjb7cxC13VqYv1qLJT_nFUzd9NfF/view"), "https://drive.google.com/file/d/1n4yUkjb7cxC13VqYv1qLJT_nFUzd9NfF/view");
+  assert.equal(at("https://drive.google.com/file/d/1n4yUkjb7cxC13VqYv1qLJT_nFUzd9NfF/preview"), "https://drive.google.com/file/d/1n4yUkjb7cxC13VqYv1qLJT_nFUzd9NfF/preview");
+  assert.equal(at("https://drive.google.com/drive/folders/folderId", { cards: [[], ["https://drive.google.com/file/d/1n4yUkjb7cxC13VqYv1qLJT_nFUzd9NfF/view"]] }), "https://drive.google.com/file/d/1n4yUkjb7cxC13VqYv1qLJT_nFUzd9NfF/view");
   ok("#311: the button sends the video's own page, not the page playing it");
 }
 

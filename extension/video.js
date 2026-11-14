@@ -384,7 +384,7 @@
     const found = [];
     const own = node.localName === "a" ? [node] : [];
     for (const a of [...own, ...(node.querySelectorAll ? node.querySelectorAll(sel) : [])]) {
-      const u = linkTo(a.getAttribute && a.getAttribute("href"));
+      const u = linkTo((a.getAttribute && a.getAttribute("href")) || a.href);
       if (u && /^https?:$/.test(u.protocol)) found.push({ u, time: Boolean(a.querySelector && a.querySelector("time")) });
     }
     return found;
@@ -667,6 +667,25 @@
         return { sure, maybe: new Map() };
       },
       own: (u) => u.hostname.startsWith("geo.") || /^\/(?:embed\/)?video\/[a-z0-9]+|^\/player/i.test(u.pathname),
+    },
+    {
+      // Google Drive: video files at /file/d/<id>/view (or /preview, or opened from a folder).
+      hosts: /^(?:drive|docs)\.google\.com$/,
+      embed: (u) => /^\/file\/d\/[^/]+\/preview/.test(u.pathname),
+      read(node) {
+        const sure = new Map();
+        for (const { u } of linksIn(node)) {
+          if (!/(^|\.)(?:drive|docs)\.google\.com$/.test(u.hostname)) continue;
+          const m = /^\/file\/d\/([\w-]+)/.exec(u.pathname);
+          if (m) sure.set(m[1], `https://drive.google.com/file/d/${m[1]}/view`);
+        }
+        for (const el of [node, ...(node.querySelectorAll?.("[data-id], [data-target-id]") || [])]) {
+          const id = el.getAttribute?.("data-id") || el.getAttribute?.("data-target-id");
+          if (/^[\w-]{20,}$/.test(id || "")) sure.set(id, `https://drive.google.com/file/d/${id}/view`);
+        }
+        return { sure, maybe: new Map() };
+      },
+      own: (u) => /^\/file\/d\/[\w-]+(?:\/(?:view|preview))?/.test(u.pathname),
     },
   ];
   // ---- the video's own address: end.
@@ -1291,11 +1310,19 @@ button:focus-visible { outline: none; }
     return s.visibility !== "hidden" && s.display !== "none" && Number(s.opacity) > 0.05;
   }
 
+  // Site-specific embedded players (Google Drive's iframe player behind its preview controls).
+  function siteVideos() {
+    if (/(^|\.)(?:drive|docs)\.google\.com$/.test(location.hostname)) {
+      return document.querySelectorAll?.('iframe[src*="youtube.googleapis.com"], iframe[src*="/preview"], [id*="video-player"] iframe') || [];
+    }
+    return [];
+  }
+
   // The topmost eligible video under (x, y): players lay their controls over the video, so the
   // video itself rarely gets the pointer's events.
   function videoAt(x, y) {
     let best = null;
-    for (const v of [...videos, ...audios, ...shadowVideos()]) {
+    for (const v of [...videos, ...audios, ...shadowVideos(), ...siteVideos()]) {
       const r = v.getBoundingClientRect();
       if (x < r.left || x > r.right || y < r.top || y > r.bottom || !eligible(v)) continue;
       if (!best || r.width * r.height < best.r.width * best.r.height) best = { v, r };
@@ -2148,7 +2175,7 @@ button:focus-visible { outline: none; }
     const t = e.target;
     if (!t.matches(":focus-visible")) return;
     const v =
-      t instanceof HTMLMediaElement ? t : [...t.querySelectorAll("video, audio")].find(eligible) || null;
+      t instanceof HTMLMediaElement ? t : [...t.querySelectorAll("video, audio"), ...siteVideos()].find(eligible) || null;
     if (!v || !eligible(v)) return;
     focusedPlayer = t;
     ask().then(() => {

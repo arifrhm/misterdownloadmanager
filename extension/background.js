@@ -2252,7 +2252,7 @@ async function playingVideo(sender, at) {
 // A site's name for comparing two addresses: without its www., mobile or other front host
 // (old.reddit.com is reddit.com), its short-link hosts as the site (fb.watch is Facebook's,
 // twitter.com is x.com).
-const SITE_ALIASES = { "fb.watch": "facebook.com", "twitter.com": "x.com" };
+const SITE_ALIASES = { "fb.watch": "facebook.com", "twitter.com": "x.com", "docs.google.com": "drive.google.com" };
 function siteKey(url) {
   const host = siteOf(url).replace(/^(www|m|mobile|web|touch|old|new|sh|music|geo|player)\./, "");
   return SITE_ALIASES[host] || host;
